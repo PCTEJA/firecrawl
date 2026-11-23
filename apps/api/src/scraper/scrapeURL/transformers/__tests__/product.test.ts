@@ -96,6 +96,7 @@ describe("fetchProduct", () => {
         { id: "2", availability: { inStock: false } },
         { id: "3", availability: { inStock: null, text: "See store" } },
         { id: "4", availability: { inStock: null, legacyInStock: false } },
+        { id: "5", availability: { inStock: false, legacyInStock: true } },
       ],
     });
 
@@ -131,7 +132,7 @@ describe("fetchProduct", () => {
       "dotnet-sdk@1.15.3",
       "python-sdk@not-a-version",
     ])("sends the legacy value for unknown stock to %s", async origin => {
-      expect(await stockFor(origin)).toEqual([true, false, true, false]);
+      expect(await stockFor(origin)).toEqual([true, false, true, false, true]);
     });
 
     it.each([
@@ -148,7 +149,7 @@ describe("fetchProduct", () => {
       "mcp-server",
       "cli.claude-code@1.29.0",
     ])("passes null through to %s", async origin => {
-      expect(await stockFor(origin)).toEqual([true, false, null, null]);
+      expect(await stockFor(origin)).toEqual([true, false, null, null, false]);
     });
   });
 

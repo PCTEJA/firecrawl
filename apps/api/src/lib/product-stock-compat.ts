@@ -39,8 +39,8 @@ export function acceptsNullStock(origin: string | null | undefined): boolean {
 
 /**
  * Shapes variant stock for the requesting client and drops the producer's
- * `legacyInStock` hint. Clients that can't read null get a boolean: the stated
- * value, else the producer's legacy value, else true (the pre-null default).
+ * `legacyInStock` hint. Clients that can't read null get the value the
+ * pre-null extractor returned: the hint, else the stated value, else true.
  */
 export function projectProductStock<T extends { variants?: unknown }>(
   product: T,
@@ -61,10 +61,13 @@ export function projectProductStock<T extends { variants?: unknown }>(
         string,
         unknown
       >;
-      if (acceptsNull || typeof rest.inStock === "boolean") {
-        return { ...variant, availability: rest };
-      }
-      const inStock = typeof legacyInStock === "boolean" ? legacyInStock : true;
+      if (acceptsNull) return { ...variant, availability: rest };
+      const inStock =
+        typeof legacyInStock === "boolean"
+          ? legacyInStock
+          : typeof rest.inStock === "boolean"
+            ? rest.inStock
+            : true;
       return { ...variant, availability: { ...rest, inStock } };
     }),
   };

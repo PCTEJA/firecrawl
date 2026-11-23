@@ -88,7 +88,7 @@ describe("projectProductStock", () => {
     ],
   };
 
-  it("gives old clients the stated value, else the legacy value, else true", () => {
+  it("gives old clients the legacy value, else the stated value, else true", () => {
     const out = projectProductStock(product, false);
     expect(out.variants.map(v => (v as any).availability)).toEqual([
       { inStock: true, text: "In stock" },
@@ -96,7 +96,7 @@ describe("projectProductStock", () => {
       { inStock: true },
       { inStock: false },
       { inStock: true },
-      { inStock: false },
+      { inStock: true },
       { inStock: true },
       { inStock: true },
       { inStock: true },
