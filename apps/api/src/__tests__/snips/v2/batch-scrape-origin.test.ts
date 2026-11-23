@@ -1,5 +1,6 @@
 const mocks = vi.hoisted(() => ({
   addScrapeJobs: vi.fn(),
+  getCrawl: vi.fn(),
 }));
 
 vi.mock(
@@ -17,6 +18,7 @@ vi.mock("../../../services/queue-jobs", async importOriginal => ({
 }));
 vi.mock("../../../lib/crawl-redis", async importOriginal => ({
   ...(await importOriginal<typeof import("../../../lib/crawl-redis")>()),
+  getCrawl: mocks.getCrawl,
   saveCrawl: vi.fn(),
   markCrawlActive: vi.fn(),
   finishCrawlKickoff: vi.fn(),
@@ -43,9 +45,10 @@ import { batchScrapeController as v2BatchScrape } from "../../../controllers/v2/
 describe.each([
   ["v1", v1BatchScrape],
   ["v2", v2BatchScrape],
-])("%s batch scrape child job origin", (_version, controller: any) => {
+])("%s batch scrape child job origin", (version, controller: any) => {
   beforeEach(() => {
     mocks.addScrapeJobs.mockReset();
+    mocks.getCrawl.mockReset();
   });
 
   async function enqueuedOrigins(body: Record<string, unknown>) {
@@ -83,4 +86,25 @@ describe.each([
   it("defaults to api when no origin is sent", async () => {
     expect(await enqueuedOrigins({})).toEqual(["api", "api"]);
   });
+
+  // v1 append requests fail scrape option validation (appendToId is not stripped) before any enqueue.
+  it.runIf(version === "v2")(
+    "gives appended children the original batch's origin, not the append request's",
+    async () => {
+      const appendToId = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+      mocks.getCrawl.mockResolvedValue({
+        team_id: "team-1",
+        crawlerOptions: null,
+        scrapeOptions: {},
+        internalOptions: { teamId: "team-1" },
+        createdAt: Date.now(),
+        origin: "python-sdk@4.57.0",
+      });
+
+      expect(
+        await enqueuedOrigins({ appendToId, origin: "js-sdk@4.56.0" }),
+      ).toEqual(["python-sdk@4.57.0", "python-sdk@4.57.0"]);
+      expect(mocks.getCrawl).toHaveBeenCalledWith(appendToId);
+    },
+  );
 });
