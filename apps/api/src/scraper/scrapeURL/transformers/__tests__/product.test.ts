@@ -95,6 +95,7 @@ describe("fetchProduct", () => {
         { id: "1", availability: { inStock: true } },
         { id: "2", availability: { inStock: false } },
         { id: "3", availability: { inStock: null, text: "See store" } },
+        { id: "4", availability: { inStock: null, legacyInStock: false } },
       ],
     });
 
@@ -112,13 +113,16 @@ describe("fetchProduct", () => {
         baseMeta([{ type: "product" }], false, origin),
         document,
       );
+      expect(JSON.stringify(out.product)).not.toContain("legacyInStock");
       return out.product!.variants.map(v => v.availability.inStock);
     }
 
     it.each([
       "python-sdk@4.57.0",
+      "python-sdk@4.58.0",
       "python-sdk.some-agent@4.30.3",
       "js-sdk@4.54.0",
+      "js-sdk@4.55.0",
       "java-sdk@1.18.0",
       "go-sdk@1.16.11",
       "rust-sdk@2.21.10",
@@ -126,15 +130,15 @@ describe("fetchProduct", () => {
       "php-sdk@1.16.7",
       "dotnet-sdk@1.15.3",
       "python-sdk@not-a-version",
-    ])("sends true for unknown stock to %s", async origin => {
-      expect(await stockFor(origin)).toEqual([true, false, true]);
+    ])("sends the legacy value for unknown stock to %s", async origin => {
+      expect(await stockFor(origin)).toEqual([true, false, true, false]);
     });
 
     it.each([
       undefined,
       "api",
-      "python-sdk@4.58.0",
-      "js-sdk@4.55.0",
+      "python-sdk@4.59.0",
+      "js-sdk@4.56.0",
       "java-sdk@1.19.0",
       "go-sdk@1.17.0",
       "rust-sdk@2.22.0",
@@ -144,7 +148,7 @@ describe("fetchProduct", () => {
       "mcp-server",
       "cli.claude-code@1.29.0",
     ])("passes null through to %s", async origin => {
-      expect(await stockFor(origin)).toEqual([true, false, null]);
+      expect(await stockFor(origin)).toEqual([true, false, null, null]);
     });
   });
 

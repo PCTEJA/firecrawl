@@ -1,8 +1,8 @@
 // First release of each SDK whose product model accepts `inStock: null`.
 // Older releases parse it as an error or as false, so they keep receiving true.
 const NULL_STOCK_SINCE: Record<string, readonly [number, number, number]> = {
-  python: [4, 58, 0],
-  js: [4, 55, 0],
+  python: [4, 59, 0],
+  js: [4, 56, 0],
   java: [1, 19, 0],
   go: [1, 17, 0],
   rust: [2, 22, 0],
@@ -37,9 +37,14 @@ export function acceptsNullStock(origin: string | null | undefined): boolean {
   return true;
 }
 
-/** Replaces unknown stock with the pre-null default (true) for clients that can't read null. */
-export function withLegacyStockDefaults<T extends { variants?: unknown }>(
+/**
+ * Shapes variant stock for the requesting client and drops the producer's
+ * `legacyInStock` hint. Clients that can't read null get a boolean: the stated
+ * value, else the producer's legacy value, else true (the pre-null default).
+ */
+export function projectProductStock<T extends { variants?: unknown }>(
   product: T,
+  acceptsNull: boolean,
 ): T {
   if (!Array.isArray(product.variants)) return product;
   return {
@@ -47,12 +52,20 @@ export function withLegacyStockDefaults<T extends { variants?: unknown }>(
     variants: product.variants.map(variant => {
       if (variant === null || typeof variant !== "object") return variant;
       const availability = (variant as { availability?: unknown }).availability;
-      const current =
-        availability !== null && typeof availability === "object"
-          ? (availability as Record<string, unknown>)
-          : {};
-      if (typeof current.inStock === "boolean") return variant;
-      return { ...variant, availability: { ...current, inStock: true } };
+      if (availability === null || typeof availability !== "object") {
+        return acceptsNull
+          ? variant
+          : { ...variant, availability: { inStock: true } };
+      }
+      const { legacyInStock, ...rest } = availability as Record<
+        string,
+        unknown
+      >;
+      if (acceptsNull || typeof rest.inStock === "boolean") {
+        return { ...variant, availability: rest };
+      }
+      const inStock = typeof legacyInStock === "boolean" ? legacyInStock : true;
+      return { ...variant, availability: { ...rest, inStock } };
     }),
   };
 }

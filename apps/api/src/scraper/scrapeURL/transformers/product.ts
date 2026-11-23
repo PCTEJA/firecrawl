@@ -5,7 +5,7 @@ import { hasFormatOfType } from "../../../lib/format-utils";
 import { isUsOnly } from "../../../lib/us-only";
 import {
   acceptsNullStock,
-  withLegacyStockDefaults,
+  projectProductStock,
 } from "../../../lib/product-stock-compat";
 
 export async function fetchProduct(
@@ -86,9 +86,10 @@ export async function fetchProduct(
   }
 
   if (data.product) {
-    document.product = acceptsNullStock(meta.internalOptions.origin)
-      ? data.product
-      : withLegacyStockDefaults(data.product);
+    document.product = projectProductStock(
+      data.product,
+      acceptsNullStock(meta.internalOptions.origin),
+    );
   } else {
     // `product` is null: the page loaded but is not a product page.
     document.warning =

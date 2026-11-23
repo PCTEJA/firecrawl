@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
-import {
-  acceptsNullStock,
-  withLegacyStockDefaults,
-} from "./product-stock-compat";
+import { acceptsNullStock, projectProductStock } from "./product-stock-compat";
 
 describe("acceptsNullStock", () => {
   it.each([
     ["python-sdk@4.57.0", false],
-    ["python-sdk@4.58.0", true],
-    ["python-sdk@4.58.1", true],
+    ["python-sdk@4.58.0", false],
+    ["python-sdk@4.59.0", true],
+    ["python-sdk@4.59.1", true],
     ["python-sdk@5.0.0", true],
     ["python-sdk@4.30.3", false],
     ["python-sdk.some-agent@4.57.0", false],
-    ["python-sdk.some-agent@4.58.0", true],
+    ["python-sdk.some-agent@4.59.0", true],
     ["js-sdk@4.54.0", false],
-    ["js-sdk@4.55.0", true],
+    ["js-sdk@4.55.0", false],
+    ["js-sdk@4.56.0", true],
     ["js-sdk.bullmq@4.51.0", false],
-    ["js-sdk.bullmq@4.55.0", true],
+    ["js-sdk.bullmq@4.56.0", true],
     ["js-sdk@0.1.0", false],
     ["js-sdk@1.0.1822", false],
     ["java-sdk@1.18.0", false],
@@ -40,8 +39,8 @@ describe("acceptsNullStock", () => {
     "python-sdk",
     "python-sdk@",
     "python-sdk@unknown",
-    "python-sdk@4.58.0-beta.1",
-    "js-sdk@4.55.0rc1",
+    "python-sdk@4.59.0-beta.1",
+    "js-sdk@4.56.0rc1",
     "java-sdk@x.y.z",
   ])("treats a known SDK with an unusable version as old: %s", origin => {
     expect(acceptsNullStock(origin)).toBe(false);
@@ -50,7 +49,7 @@ describe("acceptsNullStock", () => {
   it("normalizes case, whitespace and a trailing integration tag", () => {
     expect(acceptsNullStock(" Python-SDK@4.57.0 ")).toBe(false);
     expect(acceptsNullStock("js-sdk@4.24.0|cli")).toBe(false);
-    expect(acceptsNullStock("python-sdk@4.58")).toBe(true);
+    expect(acceptsNullStock("python-sdk@4.59")).toBe(true);
   });
 
   it.each([
@@ -71,38 +70,64 @@ describe("acceptsNullStock", () => {
   });
 });
 
-describe("withLegacyStockDefaults", () => {
-  it("maps null, missing and non-boolean stock to true and keeps known values", () => {
-    const product = {
-      title: "T",
-      url: "https://shop.test/p",
-      variants: [
-        { id: "a", availability: { inStock: true, text: "In stock" } },
-        { id: "b", availability: { inStock: false } },
-        { id: "c", availability: { inStock: null } },
-        { id: "d", availability: {} },
-        { id: "e", availability: null },
-        { id: "f" },
-        { id: "g", availability: { inStock: "yes" } },
-      ],
-    };
+describe("projectProductStock", () => {
+  const product = {
+    title: "T",
+    url: "https://shop.test/p",
+    variants: [
+      { id: "a", availability: { inStock: true, text: "In stock" } },
+      { id: "b", availability: { inStock: false } },
+      { id: "c", availability: { inStock: null } },
+      { id: "d", availability: { inStock: null, legacyInStock: false } },
+      { id: "e", availability: { inStock: null, legacyInStock: true } },
+      { id: "f", availability: { inStock: false, legacyInStock: true } },
+      { id: "g", availability: {} },
+      { id: "h", availability: null },
+      { id: "i" },
+      { id: "j", availability: { inStock: "yes" } },
+    ],
+  };
 
-    const out = withLegacyStockDefaults(product);
-
+  it("gives old clients the stated value, else the legacy value, else true", () => {
+    const out = projectProductStock(product, false);
     expect(out.variants.map(v => (v as any).availability)).toEqual([
       { inStock: true, text: "In stock" },
+      { inStock: false },
+      { inStock: true },
+      { inStock: false },
+      { inStock: true },
       { inStock: false },
       { inStock: true },
       { inStock: true },
       { inStock: true },
       { inStock: true },
-      { inStock: true },
     ]);
-    expect(product.variants[2].availability).toEqual({ inStock: null });
+    expect(product.variants[3].availability).toEqual({
+      inStock: null,
+      legacyInStock: false,
+    });
+  });
+
+  it("keeps null for new clients and never exposes legacyInStock", () => {
+    const out = projectProductStock(product, true);
+    expect(out.variants.map(v => (v as any).availability)).toEqual([
+      { inStock: true, text: "In stock" },
+      { inStock: false },
+      { inStock: null },
+      { inStock: null },
+      { inStock: null },
+      { inStock: false },
+      {},
+      null,
+      undefined,
+      { inStock: "yes" },
+    ]);
+    expect(JSON.stringify(out)).not.toContain("legacyInStock");
   });
 
   it("leaves a product without a variants array untouched", () => {
-    const product = { title: "T", url: "u" } as any;
-    expect(withLegacyStockDefaults(product)).toBe(product);
+    const bare = { title: "T", url: "u" } as any;
+    expect(projectProductStock(bare, false)).toBe(bare);
+    expect(projectProductStock(bare, true)).toBe(bare);
   });
 });
